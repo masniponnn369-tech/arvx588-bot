@@ -1,0 +1,48 @@
+bot:
+  name: "ARVX 588 Defense Shield"
+  prefix: "."
+  use_pairing_code: true
+  timezone: "Asia/Jakarta"
+
+owner:
+  number: "628157159957"
+  bot_number: "79778547925"
+  dm_security_log: true # Kirim laporan otomatis ke WA pribadi owner tiap ada pelanggaran/eksekusi
+
+group:
+  name: "ARVX 588"
+  invite_link: "https://chat.whatsapp.com/IcECPgfBoCT0HT78QJxoyr?s=cl&p=a&mlu=4&ilr=4"
+  whitelist_invite_code: "https://chat.whatsapp.com/IcECPgfBoCT0HT78QJxoyr?s=cl&p=a&mlu=4&ilr=4"
+  intro_timeout_hours: 24
+
+defense_defaults:
+  welcome: true
+  antilink: true
+  antispam: true
+  antivirtex: true
+  antitoxic: true
+  antitag: true
+  antiraid: true         # Otomatis kunci grup jika >5 akun masuk bersamaan dalam 10 detik
+  antidelete: false      # Deteksi & kirim ulang pesan yang dihapus member
+  autokickintro: false   # Auto-kick member baru yang belum intro setelah 24 jam
+  lockdown: false
+
+thresholds:
+  max_warn: 3            # Batas peringatan sebelum auto-kick
+  spam_max_messages: 5   # Maksimal pesan dalam rentang waktu spam_window_sec
+  spam_window_sec: 5
+  virtex_max_chars: 3500 # Batas maksimal karakter sebelum dianggap virtex/crash text
+  max_mentions: 5        # Batas maksimal tag per pesan untuk member biasa
+  raid_max_joins: 5      # Maksimal member masuk dalam 10 detik sebelum auto-lockdown
+
+default_badwords:
+  - "anjing"
+  - "babi"
+  - "kontol"
+  - "memek"
+  - "bangsat"
+  - "judi"
+  - "slot"
+  - "gacor"
+  - "bokep"
+  - "open bo"
