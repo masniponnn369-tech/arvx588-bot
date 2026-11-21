@@ -432,7 +432,7 @@ return;
 }
 // Lapis 3: Anti-Link Grup WA, Channel, Telegram, & Tautan Luar
 if (settings.antilink) {
-const linkRegex = /(whatsapp.com|whatsapp.com|t.me/|telegram.me/|discord.gg/|https?://)/i;
+const linkRegex = /(whatsapp\.com|t\.me\/|telegram\.me\/|discord\.gg\/|https?:\/\/)/i;
 if (linkRegex.test(body) && !body.includes(WHITELIST_CODE)) {
 await handleViolation(sock, from, groupName, sender, senderNumber, m.key, 'Mengirim Tautan / Promosi Luar Tanpa Izin', isBotAdmin, false);
 return;
