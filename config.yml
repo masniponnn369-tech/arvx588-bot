@@ -7,42 +7,43 @@ bot:
 owner:
   number: "628157159957"
   bot_number: "79778547925"
-  dm_security_log: true # Kirim laporan otomatis ke WA pribadi owner tiap ada pelanggaran/eksekusi
+  dm_security_log: true
 
 group:
   name: "ARVX 588"
-  invite_link: "https://chat.whatsapp.com/IcECPgfBoCT0HT78QJxoyr?s=cl&p=a&mlu=4&ilr=4"
-  whitelist_invite_code: "https://chat.whatsapp.com/IcECPgfBoCT0HT78QJxoyr?s=cl&p=a&mlu=4&ilr=4"
+  invite_link: "https://chat.whatsapp.com/IcECPgfBoCT0HT78QJxoyr"
+  whitelist_invite_code: "IcECPgfBoCT0HT78QJxoyr"
   intro_timeout_hours: 24
+  channel_jid: ""
 
+# PERTAHANAN DEFAULT - ANTI-TOXIC / BADWORDS UDAH DIHAPUS TOTAL
+# Kata kotor biar admin asli yang handle, bot gak ikut campur
 defense_defaults:
   welcome: true
   antilink: true
   antispam: true
   antivirtex: true
-  antitoxic: true
   antitag: true
-  antiraid: true         # Otomatis kunci grup jika >5 akun masuk bersamaan dalam 10 detik
-  antidelete: false      # Deteksi & kirim ulang pesan yang dihapus member
-  autokickintro: false   # Auto-kick member baru yang belum intro setelah 24 jam
+  antiraid: true
+  antidelete: true
+  autokickintro: false
   lockdown: false
+  antiall: true
+  antiedit: true
+  antiviewonce: true
+  antizap: true
+  antistickerspam: true
+  antifakeadmin: true
+  antiimpersonasi: true
+  scamcheck: true
+  antipromo: true
+  antidisappearing: true
+  antihapusreaksi: true
 
 thresholds:
-  max_warn: 3            # Batas peringatan sebelum auto-kick
-  spam_max_messages: 5   # Maksimal pesan dalam rentang waktu spam_window_sec
+  max_warn: 3
+  spam_max_messages: 5
   spam_window_sec: 5
-  virtex_max_chars: 3500 # Batas maksimal karakter sebelum dianggap virtex/crash text
-  max_mentions: 5        # Batas maksimal tag per pesan untuk member biasa
-  raid_max_joins: 5      # Maksimal member masuk dalam 10 detik sebelum auto-lockdown
-
-default_badwords:
-  - "anjing"
-  - "babi"
-  - "kontol"
-  - "memek"
-  - "bangsat"
-  - "judi"
-  - "slot"
-  - "gacor"
-  - "bokep"
-  - "open bo"
+  virtex_max_chars: 4000
+  max_mentions: 5
+  raid_max_joins: 5
