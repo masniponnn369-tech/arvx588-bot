@@ -357,7 +357,7 @@ console.error('Error group-participants.update:', err);
 // ================= HANDLER PESAN, ANTI-DELETE, & PERTAHANAN =================
 sock.ev.on('messages.upsert', async ({ messages, type }) => {
 if (type !== 'notify') return;
-const m = messages;
+const m = messages[0];
 if (!m?.message) return;
 const from = m.key.remoteJid;
 const isGroup = from.endsWith('@g.us');
@@ -443,7 +443,6 @@ const mentionedJids = m.message.extendedTextMessage?.contextInfo?.mentionedJid |
 if (settings.antitag && mentionedJids.length > (cfg.thresholds.max_mentions || 5)) {
 await handleViolation(sock, from, groupName, sender, senderNumber, m.key, 'Melakukan Tag Massal / Hidetag Tanpa Izin Admin', isBotAdmin, false);
 return;
-}
 }
 // Lapis 5: Anti-Toxic & Badword Filter
 if (settings.antitoxic && body.length > 0) {
@@ -584,7 +583,7 @@ if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Khusus Admi
 if (!isBotAdmin) return sock.sendMessage(from, { text: '❌ Jadikan bot Admin terlebih dahulu!' }, { quoted: m });
 const mentioned = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
 const quotedUser = m.message.extendedTextMessage?.contextInfo?.participant;
-const target = mentioned || quotedUser;
+const target = mentioned[0] || quotedUser;
 if (!target) return sock.sendMessage(from, { text: `Tag atau balas pesan member! Contoh: *${PREFIX}ban @user Rusuh*` }, { quoted: m });
 const targetNum = target.split('@')[0].split(':')[0];
 if (targetNum === OWNER_NUMBER) return sock.sendMessage(from, { text: '❌ Tidak bisa memblokir Owner!' }, { quoted: m });
@@ -715,7 +714,7 @@ if (!isGroup) return;
 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Khusus Admin Grup!' }, { quoted: m });
 const mentioned = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
 const quotedUser = m.message.extendedTextMessage?.contextInfo?.participant;
-const target = mentioned || quotedUser;
+const target = mentioned[0] || quotedUser;
 if (!target) return sock.sendMessage(from, { text: 'Tag atau balas pesan member yang ingin diberi peringatan.' }, { quoted: m });
 const targetNum = target.split('@')[0].split(':')[0];
 await handleViolation(sock, from, groupName, target, targetNum, null, `Peringatan Manual oleh Admin (+${senderNumber})`, isBotAdmin, false);
@@ -726,7 +725,7 @@ if (!isGroup) return;
 if (!isAdmin && !isOwner) return sock.sendMessage(from, { text: '❌ Khusus Admin Grup!' }, { quoted: m });
 const mentioned = m.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
 const quotedUser = m.message.extendedTextMessage?.contextInfo?.participant;
-const target = mentioned || quotedUser;
+const target = mentioned[0] || quotedUser;
 if (!target) return sock.sendMessage(from, { text: 'Tag atau balas pesan member.' }, { quoted: m });
 const targetNum = target.split('@')[0].split(':')[0];
 if (db.warns[from]) db.warns[from][targetNum] = 0;
