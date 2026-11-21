@@ -192,11 +192,15 @@ async function startBot() {
         if (!m?.message) continue;
         if (m.key.fromMe) continue; // FIX LOOP
         if (m.key.remoteJid === 'status@broadcast') continue;
-        const from = normalizeJid(m.key.remoteJid);
-        const isGroup = from.endsWith('@g.us');
-        const settings = isGroup ? getGroupSettings(from) : null;
-        if (isGroup && isBotDisabled(from)) continue;
+        const from=normalizeJid(m.key.remoteJid);
+        const isGroup=from.endsWith('@g.us');
+        const settings=isGroup?getGroupSettings(from):null;
 
+        // FIX .on: kasih jalan buat .on meskipun bot lagi OFF
+        const bodyAwal = m.message.conversation || m.message.extendedTextMessage?.text || '';
+        const isOnCmd = bodyAwal.trim().toLowerCase() === `${PREFIX}on` || bodyAwal.trim().toLowerCase() === '.on';
+        if(isGroup && isBotDisabled(from) && !isOnCmd) continue; // kalau bukan .on, baru diem
+        
         // 17 Anti-Disappearing: deteksi pesan ephemeral (pesan ilang)
         const isEphemeral = !!m.message.ephemeralMessage || !!m.message.viewOnceMessageV2 || m.message.conversation?.length === 0;
         if (isGroup && settings?.antiDisappearing && m.message.ephemeralMessage) { await safeSend(sock, from, { text: `⏳ *DISAPPEARING TERDETEKSI*\nAda pesan yang bakal ilang otomatis. Bukti bisa hilang, admin harap pantau.` }); }
