@@ -1,4 +1,4 @@
-import { checkNews } from './watcher.js';
+import { checkNews, fetchWANewsAll, fetchBaileysNews } from './watcher.js';
 import 'dotenv/config';
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadContentFromMessage } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
@@ -502,6 +502,18 @@ async function startBot() {
   });
   t += `Ketik *.wanews* lagi buat refresh.`;
   await safeSend(sock, from, { text: t }, { quoted: m }); break;
+}
+           case 'baileys': {
+  const list = await fetchBaileysNews(5);
+  if (!list.length) { await safeSend(sock, from, { text: '❌ Gagal ambil update Baileys. Coba lagi 1 menit.' }, { quoted: m }); break; }
+  let t = `╭━━━ 📦 BAILEYS UPDATE - RESMI ━━━╮\n`;
+  t += `Library: @whiskeysockets/baileys\nVersi aman: 6.7.24 (stabil) / 7.0.0-rc14 (RC)\nWiki: https://baileys.wiki\n\n`;
+  list.forEach((n, i) => {
+    t += `${i+1}. ${n.title}\n📅 ${n.date || '-'}\n🔗 ${n.link}\n\n`;
+  });
+  t += `Ketik *.wanews* buat berita WA, *.baileys* buat update library.`;
+  await safeSend(sock, from, { text: t }, { quoted: m });
+  break;
 }
           case 'menu': case 'help': {
             // 28 Interactive Buttons: Baileys interactiveMessage - fallback teks kalau gagal
