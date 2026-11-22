@@ -46,6 +46,86 @@ function loadDB() {
 }
 function saveDB(d) { try { fs.writeFileSync(DB_PATH, JSON.stringify(d, null, 2)); } catch {} }
 let db = loadDB();
+// ============ WA NEWS V3 - ON DEMAND ONLY, NO AUTO SPAM ============
+// Cara kerja: cuma jalan kalau ada yang ketik .wanews
+// Sumber: RSS semua, bukan scraping HTML -> lolos Cloudflare, no iklan, no sampah
+const WA_NEWS_SOURCES = [
+  { name: 'WABetaInfo', url: 'https://wabetainfo.com/feed' },
+  { name: 'WABetaInfo Android', url: 'https://wabetainfo.com/category/android/feed' },
+  { name: 'WABetaInfo iOS', url: 'https://wabetainfo.com/category/ios/feed' },
+  { name: 'WABetaInfo Web', url: 'https://wabetainfo.com/category/web/feed' },
+  { name: 'WhatsApp Blog', url: 'https://blog.whatsapp.com/feed' },
+];
+
+const WA_NEWS_UAS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+];
+
+function parseRSS(xml) {
+  if (!xml) return [];
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => {
+    const b = m[1];
+    const get = (tag) => {
+      const x = b.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+      return x ? x[1].replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, '').trim() : '';
+    };
+    return { title: get('title'), link: get('link'), pubDate: get('pubDate'), desc: get('description') };
+  });
+  return items;
+}
+
+// FILTER ANTI SAMPAH - ini yang bikin bersih
+function isValidWANews(it) {
+  const t = ((it.title || '') + ' ' + (it.desc || '')).toLowerCase();
+  if (!it.title || !it.link || !it.link.startsWith('http')) return false;
+  // Tolak sampah / iklan / clickbait
+  const BAD = ['giveaway','casino','slot','judi','crypto','airdrop','vpn','sponsor','advertisement','buy now','discount code','promo code','porn','betting','forex','pinjol'];
+  if (BAD.some(b => t.includes(b))) return false;
+  // Wajib ada kata kunci WA update
+  const GOOD = ['whatsapp','wa beta','android','ios','web','rolling out','introduces','testing','feature','update','new','backup','sticker','group','status','channel','privacy','call','message','theme'];
+  if (!GOOD.some(k => t.includes(k))) return false;
+  return true;
+}
+
+async function fetchWANewsAll(limit = 5) {
+  const all = [];
+  // Fetch semua sumber paralel, tapi dengan header anti-Cloudflare
+  const jobs = WA_NEWS_SOURCES.map(async (src) => {
+    try {
+      const ua = WA_NEWS_UAS[Math.floor(Math.random() * WA_NEWS_UAS.length)];
+      const r = await axios.get(src.url, {
+        timeout: 12000,
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.google.com/',
+          'Cache-Control': 'no-cache',
+        },
+        maxRedirects: 3,
+      });
+      const items = parseRSS(typeof r.data === 'string' ? r.data : '');
+      for (const it of items) {
+        if (isValidWANews(it)) all.push({ ...it, source: src.name });
+      }
+    } catch (e) { console.log('wanews fail', src.name, e.message); }
+  });
+  await Promise.allSettled(jobs);
+
+  // DEDUP: link yang sama jangan double, walau dari sumber beda
+  const seen = new Set();
+  const uniq = [];
+  for (const n of all) {
+    const key = n.link.split('?')[0].toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key); uniq.push(n);
+  }
+  // SORT: paling baru dulu
+  uniq.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+  return uniq.slice(0, limit);
+}
 function getGroupSettings(gid) {
   if (!db.groups[gid]) { db.groups[gid] = { ...cfg.defense_defaults, antiAll: true, antiEdit: true, antiViewOnce: true, antiZap: true, antiStickerSpam: true, antiFakeAdmin: true, antiImpersonasi: true, scamCheck: true, antiPromosi: true, antiDisappearing: true, antiHapusReaksi: true, antiPollPalsu: true, smartText: true, welcome: true, antilink: true, antispam: true, antivirtex: true, antitag: true, antidelete: true, antiraid: true, autokickintro: true, wanews: true }; saveDB(db); }
   const s = db.groups[gid];
@@ -372,16 +452,26 @@ async function startBot() {
             if (text.trim() === String(expect)) { db.intros[from] ??= {}; db.intros[from][senderNumber] = { ...(db.intros[from][senderNumber] || {}), verified: true, verifiedAt: Date.now() }; saveDB(db); await safeSend(sock, from, { text: `✅ *VERIFIKASI BERHASIL*\n@${senderNumber} resmi terverifikasi ARVX 588!`, mentions: [sender] }, { quoted: m }); } else await safeSend(sock, from, { text: '❌ Kode salah! Cek kode di pesan welcome.' }, { quoted: m }); break;
           }
                       case 'wanews': {
-            if (!isGroup) break;
-            if (text === 'off' && (isAdmin || isOwner)) { const s = getGroupSettings(from); s.wanews = false; saveDB(db); await safeSend(sock, from, { text: '🔕 WA News OFF di grup ini.' }, { quoted: m }); break; }
-            if (text === 'on' && (isAdmin || isOwner)) { const s = getGroupSettings(from); s.wanews = true; saveDB(db); await safeSend(sock, from, { text: '🔔 WA News ON di grup ini.' }, { quoted: m }); break; }
-            // Kalau cuma .wanews doang, langsung cek manual sekarang
-            await safeSend(sock, from, { text: '🔍 Lagi cek update WhatsApp terbaru...' }, { quoted: m });
-            let count = 0; let out = `📰 *5 UPDATE WHATSAPP TERBARU*\n\n`;
-            await checkNews(async (n) => { count++; out += `*${count}. ${n.title}*\n[${n.source}] ${n.date}\n${n.link}\n\n`; });
-            if (!count) out += `Udah paling update! Gak ada berita baru dalam 15 menit terakhir.\nCoba lagi nanti, atau ketik ${PREFIX}wanews on buat auto-update.`;
-            await safeSend(sock, from, { text: out }, { quoted: m }); break;
-          }
+  if (!isGroup && !isOwner) { await safeSend(sock, from, { text: 'Ketik di grup!' }, { quoted: m }); break; }
+  const s = getGroupSettings(from);
+  // Admin bisa matiin/nyalain tampilannya, tapi TETAP on-demand, gak auto-kirim
+  if (text === 'on') { s.wanews = true; saveDB(db); await safeSend(sock, from, { text: '✅ WA News ON - ketik .wanews buat liat' }, { quoted: m }); break; }
+  if (text === 'off') { s.wanews = false; saveDB(db); await safeSend(sock, from, { text: '🔕 WA News OFF' }, { quoted: m }); break; }
+  if (s.wanews === false) { await safeSend(sock, from, { text: '🔕 WA News dimatiin admin. Ketik .wanews on buat nyalain.' }, { quoted: m }); break; }
+
+  await safeSend(sock, from, { text: '🔍 Lagi cek semua sumber WA update...' }, { quoted: m });
+  const news = await fetchWANewsAll(5);
+  if (!news.length) { await safeSend(sock, from, { text: '❌ Gagal ambil berita. Coba lagi 1 menit lagi.' }, { quoted: m }); break; }
+
+  let t = `📰 *WA UPDATE TERBARU - REALTIME*\n_Dicek dari WABetaInfo + WhatsApp Blog, tanpa iklan_\n\n`;
+  news.forEach((n, i) => {
+    const tanggal = n.pubDate ? new Date(n.pubDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '';
+    const cleanDesc = (n.desc || '').replace(/\s+/g, ' ').slice(0, 130);
+    t += `${i + 1}. *${n.title}*\n${cleanDesc}...\n📅 ${tanggal} | 📡 ${n.source}\n🔗 ${n.link}\n\n`;
+  });
+  t += `Ketik *.wanews* lagi buat refresh.`;
+  await safeSend(sock, from, { text: t }, { quoted: m }); break;
+}
           case 'menu': case 'help': {
             // 28 Interactive Buttons: Baileys interactiveMessage - fallback teks kalau gagal
             const menuText = `╭━━━ ARVX 588 - FULL 38 FITUR ━━━╮\n👤 @${senderNumber}\n\n📋 MEMBER\n${PREFIX}intro | ${PREFIX}listintro | ${PREFIX}cekintro | ${PREFIX}verif [kode] | ${PREFIX}linkgrup\n${PREFIX}s | ${PREFIX}steks [teks] | ${PREFIX}rvo | ${PREFIX}cekweb [link] | ${PREFIX}ai [tanya]\n${PREFIX}poll [judul] | opsi1,opsi2 | ${PREFIX}hasilpoll | ${PREFIX}topreact | ${PREFIX}smart\n${PREFIX}pin [teks] | ${PREFIX}event [judul] | [tanggal] | ${PREFIX}jadwal [detik] [pesan]\n${PREFIX}scamcek @user | ${PREFIX}cekadmin @user | ${PREFIX}report [alasan]\n${PREFIX}off | ${PREFIX}on\n ${PREFIX}wanews | ${PREFIX}wanews on/off \n\n🛡️ ADMIN\n${PREFIX}defense | ${PREFIX}lockdown on/off | ${PREFIX}lock / ${PREFIX}unlock | ${PREFIX}onlyadmin\n${PREFIX}ban | ${PREFIX}unban | ${PREFIX}listban | ${PREFIX}warn | ${PREFIX}resetwarn\n${PREFIX}kick | ${PREFIX}promote | ${PREFIX}demote | ${PREFIX}grup buka/tutup\n${PREFIX}tagall | ${PREFIX}hidetag | ${PREFIX}kickunverified | ${PREFIX}resetlink\n${PREFIX}channelpost [pesan] | ${PREFIX}communitykick @user\n⚙️ ${PREFIX}antilink/antispam/antivirtex/antitag/antidelete/antiraid/antiall/antiedit/antiviewonce/antizap/antistickerspam/antifakeadmin/antiimpersonasi/scamcheck/antipromosi/antidisappearing/antihapusreaksi/antipollpalsu/smarttext on/off\n📝 Kata kotor: DIMATIKAN - admin asli yang handle.`;
