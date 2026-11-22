@@ -1,4 +1,4 @@
-import { checkNews, fetchWANewsAll, fetchBaileysNews } from './watcher.js';
+import { fetchWANewsAll, fetchBaileysNews, fetchLibsNews, LIB_WEBSITES, checkNews } from './watcher.js';
 import 'dotenv/config';
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadContentFromMessage } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
@@ -478,6 +478,27 @@ async function startBot() {
   await safeSend(sock, from, { text: t }, { quoted: m });
   break;
 }
+            case 'lib': {
+  let t = `╭━━━ 📚 SEMUA LIBRARY BOT ARVX ━━━╮\n`;
+  t += `Total: 12 library, semua resmi, aktif, gak ke-block\n\n`;
+  for (const l of LIB_WEBSITES) {
+    t += `📦 ${l.lib} - v${l.versi}\n🌐 ${l.web}\n\n`;
+  }
+  t += `Ketik *.libupdate* buat cek update terbarunya.`;
+  await safeSend(sock, from, { text: t }, { quoted: m });
+  break;
+}
+
+          case 'libupdate': {
+  const list = await fetchLibsNews(10);
+  if (!list.length) { await safeSend(sock, from, { text: '❌ Gagal ambil update library. Coba lagi 1 menit.' }, { quoted: m }); break; }
+  let t = `╭━━━ 🔄 UPDATE LIBRARY TERBARU ━━━╮\n\n`;
+  list.forEach((n, i) => {
+    t += `${i+1}. [${n.source}] ${n.title}\n📅 ${n.date || '-'}\n🔗 ${n.link}\n\n`;
+  });
+  await safeSend(sock, from, { text: t }, { quoted: m });
+  break;
+      }
           case 'menu': case 'help': {
             // 28 Interactive Buttons: Baileys interactiveMessage - fallback teks kalau gagal
             const menuText = `╭━━━ ARVX 588 - FULL 38 FITUR ━━━╮\n👤 @${senderNumber}\n\n📋 MEMBER\n${PREFIX}intro | ${PREFIX}listintro | ${PREFIX}cekintro | ${PREFIX}verif [kode] | ${PREFIX}linkgrup\n${PREFIX}s | ${PREFIX}steks [teks] | ${PREFIX}rvo | ${PREFIX}cekweb [link] | ${PREFIX}ai [tanya]\n${PREFIX}poll [judul] | opsi1,opsi2 | ${PREFIX}hasilpoll | ${PREFIX}topreact | ${PREFIX}smart\n${PREFIX}pin [teks] | ${PREFIX}event [judul] | [tanggal] | ${PREFIX}jadwal [detik] [pesan]\n${PREFIX}scamcek @user | ${PREFIX}cekadmin @user | ${PREFIX}report [alasan]\n${PREFIX}off | ${PREFIX}on\n ${PREFIX}wanews | ${PREFIX}wanews on/off \n\n🛡️ ADMIN\n${PREFIX}defense | ${PREFIX}lockdown on/off | ${PREFIX}lock / ${PREFIX}unlock | ${PREFIX}onlyadmin\n${PREFIX}ban | ${PREFIX}unban | ${PREFIX}listban | ${PREFIX}warn | ${PREFIX}resetwarn\n${PREFIX}kick | ${PREFIX}promote | ${PREFIX}demote | ${PREFIX}grup buka/tutup\n${PREFIX}tagall | ${PREFIX}hidetag | ${PREFIX}kickunverified | ${PREFIX}resetlink\n${PREFIX}channelpost [pesan] | ${PREFIX}communitykick @user\n⚙️ ${PREFIX}antilink/antispam/antivirtex/antitag/antidelete/antiraid/antiall/antiedit/antiviewonce/antizap/antistickerspam/antifakeadmin/antiimpersonasi/scamcheck/antipromosi/antidisappearing/antihapusreaksi/antipollpalsu/smarttext on/off\n📝 Kata kotor: DIMATIKAN - admin asli yang handle.`;
