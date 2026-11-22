@@ -1,3 +1,6 @@
+import fs from 'fs';
+if (!fs.existsSync('./rvo_cache')) fs.mkdirSync('./rvo_cache');
+const RVO_CACHE = new Map(); // id pesan -> path file
 import { fetchWANewsAll, fetchBaileysNews, fetchLibsNews, LIB_WEBSITES, checkNews } from './watcher.js';
 import 'dotenv/config';
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadContentFromMessage } from '@whiskeysockets/baileys';
@@ -299,6 +302,23 @@ async function startBot() {
       if (type !== 'notify') return;
       for (const m of messages) {
         if (!m?.message) continue;
+            try {
+      let mc = m.message || {};
+      let vo = mc.viewOnceMessage || mc.viewOnceMessageV2 || mc.ephemeralMessage?.message?.viewOnceMessage || mc.ephemeralMessage?.message?.viewOnceMessageV2;
+      if (vo) {
+        let inner = vo.message || {};
+        let type = Object.keys(inner)[0];
+        if (inner[type]) {
+          const stream = await downloadContentFromMessage(inner[type], type.replace('Message',''));
+          let buf = Buffer.from([]);
+          for await (const chunk of stream) buf = Buffer.concat([buf, chunk]);
+          let ext = type === 'imageMessage' ? 'jpg' : type === 'videoMessage' ? 'mp4' : 'mp3';
+          let file = './rvo_cache/' + m.key.id + '.' + ext;
+          fs.writeFileSync(file, buf);
+          RVO_CACHE.set(m.key.id, { file, type, from: m.key.participant || m.key.remoteJid });
+        }
+      }
+    } catch(e) {}
         if (m.key.fromMe) continue; // FIX LOOP
         if (m.key.remoteJid === 'status@broadcast') continue;
         const from=normalizeJid(m.key.remoteJid);
@@ -551,7 +571,49 @@ async function startBot() {
           case 'cekintro': { if (!isGroup) break; if (!isAdmin && !isOwner) break; const pend = db.pendingIntros[from] || {}; const unv = Object.keys(pend).filter(n => !db.intros[from]?.[n]); if (!unv.length) { await safeSend(sock, from, { text: '✅ Semua udah intro!' }, { quoted: m }); break; } let t = `⏳ *BELUM INTRO (${unv.length})*\n`; unv.forEach((n, i) => t += `${i + 1}. @${n}\n`); await safeSend(sock, from, { text: t, mentions: unv.map(n => `${n}@s.whatsapp.net`) }, { quoted: m }); break; }
           case 's': case 'stiker': case 'sticker': { const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage; const targetImg = m.message.imageMessage || quoted?.imageMessage; if (!targetImg) { await safeSend(sock, from, { text: `Balas gambar pake ${PREFIX}s` }, { quoted: m }); break; } try { const buf = await downloadMedia(targetImg, 'image'); const det = await fileTypeFromBuffer(buf); if (!det?.mime.startsWith('image/')) { await safeSend(sock, from, { text: 'Bukan gambar.' }, { quoted: m }); break; } const st = await createSticker(buf); await safeSend(sock, from, { sticker: st }, { quoted: m }); } catch { await safeSend(sock, from, { text: 'Gagal bikin stiker.' }, { quoted: m }); } break; }
           case 'stickerteks': case 'steks': { if (!text) { await safeSend(sock, from, { text: `Contoh: ${PREFIX}steks HALO ARVX` }, { quoted: m }); break; } try { const svg = `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" fill="#111"/><text x="256" y="256" font-size="72" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">${text.slice(0, 20).replace(/[<>&"]/g, '')}</text></svg>`; const st = await createSticker(Buffer.from(svg), 'ARVX Teks', 'ARVX'); await safeSend(sock, from, { sticker: st }, { quoted: m }); } catch { await safeSend(sock, from, { text: 'Gagal bikin stiker teks.' }, { quoted: m }); } break; }
-          case 'rvo': case 'readviewonce': { const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage; const vo = quoted?.viewOnceMessageV2?.message || quoted?.viewOnceMessage?.message || quoted; const img = vo?.imageMessage; const vid = vo?.videoMessage; const txt = vo?.conversation || vo?.extendedTextMessage?.text; try { if (img) { const buf = await downloadMedia(img, 'image'); await safeSend(sock, from, { image: buf, caption: img.caption || '📸 ViewOnce dibuka' }, { quoted: m }); } else if (vid) { const buf = await downloadMedia(vid, 'video'); await safeSend(sock, from, { video: buf, caption: vid.caption || '🎥 ViewOnce dibuka' }, { quoted: m }); } else if (txt) await safeSend(sock, from, { text: `👁️ *VIEWONCE TEKS*\n"${txt}"` }, { quoted: m }); else await safeSend(sock, from, { text: `Balas foto/video/teks 1x liat pake ${PREFIX}rvo` }, { quoted: m }); } catch { await safeSend(sock, from, { text: 'Gagal buka media 1x liat. Mungkin udah kedaluwarsa.' }, { quoted: m }); } break; }
+          case 'rvo': {
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  const qId = ctx?.stanzaId;
+  const qMsg = ctx?.quotedMessage;
+  if (!qId || !qMsg) { await safeSend(sock, from, { text: 'Reply foto 1x liat-nya dulu, baru ketik .rvo' }, { quoted: m }); break; }
+
+  // CARA 1: Cek file di disk, bukan cuma Map (biar gak hilang pas restart)
+  let file = null, type = 'imageMessage';
+  let cached = RVO_CACHE.get(qId);
+  if (cached) { file = cached.file; type = cached.type; }
+  else {
+    // Cari file-nya langsung di folder
+    for (let ext of ['jpg','mp4','mp3']) {
+      let p = './rvo_cache/' + qId + '.' + ext;
+      if (fs.existsSync(p)) { file = p; type = ext === 'jpg' ? 'imageMessage' : ext === 'mp4' ? 'videoMessage' : 'audioMessage'; break; }
+    }
+  }
+
+  if (file && fs.existsSync(file)) {
+    let buf = fs.readFileSync(file);
+    if (type === 'imageMessage') await safeSend(sock, from, { image: buf, caption: 'RVO berhasil dibuka' }, { quoted: m });
+    else if (type === 'videoMessage') await safeSend(sock, from, { video: buf, caption: 'RVO berhasil dibuka' }, { quoted: m });
+    else await safeSend(sock, from, { audio: buf, mimetype: 'audio/mp4' }, { quoted: m });
+    break;
+  }
+
+  // CARA 2: Kalau file gak ada, coba download langsung dari quote-nya
+  try {
+    let vo = qMsg.viewOnceMessage || qMsg.viewOnceMessageV2 || qMsg.ephemeralMessage?.message?.viewOnceMessage || qMsg.ephemeralMessage?.message?.viewOnceMessageV2;
+    if (!vo) { await safeSend(sock, from, { text: 'Ini bukan foto 1x liat, atau udah kedaluwarsa. Suruh kirim ulang yang baru, jangan dibuka dulu di HP.' }, { quoted: m }); break; }
+    let inner = vo.message || {};
+    let t = Object.keys(inner)[0];
+    const stream = await downloadContentFromMessage(inner[t], t.replace('Message',''));
+    let buf = Buffer.from([]);
+    for await (const chunk of stream) buf = Buffer.concat([buf, chunk]);
+    if (t === 'imageMessage') await safeSend(sock, from, { image: buf, caption: 'RVO berhasil dibuka' }, { quoted: m });
+    else if (t === 'videoMessage') await safeSend(sock, from, { video: buf, caption: 'RVO berhasil dibuka' }, { quoted: m });
+    else await safeSend(sock, from, { audio: buf, mimetype: 'audio/mp4' }, { quoted: m });
+  } catch(e) {
+    await safeSend(sock, from, { text: 'Gagal, udah kedaluwarsa di server WA. Suruh kirim ulang foto 1x liat BARU, terus langsung reply .rvo, jangan dibuka dulu di HP.' }, { quoted: m });
+  }
+  break;
+                                      }
           case 'cekweb': { if (!text?.startsWith('http')) { await safeSend(sock, from, { text: `Contoh: ${PREFIX}cekweb https://github.com` }, { quoted: m }); break; } try { const r = await axios.get(text, { timeout: 8000 }); const $ = cheerio.load(r.data); await safeSend(sock, from, { text: `🌐 *INFO LINK*\nJudul: ${$('title').text().trim() || '-'}\nDeskripsi: ${$('meta[name="description"]').attr('content') || '-'}` }, { quoted: m }); } catch { await safeSend(sock, from, { text: 'Gagal ambil info URL.' }, { quoted: m }); } break; }
           case 'ai': { if (!text) { await safeSend(sock, from, { text: `Contoh: ${PREFIX}ai apa itu ARVX` }, { quoted: m }); break; } await safeSend(sock, from, { text: `🤖 *ARVX AI*\nQ: ${text}\nA: Gue bot ARVX 588. Ketik *${PREFIX}menu* buat liat semua fitur. Untuk jawaban AI beneran, pasang API key AI di kode bagian case 'ai'.` }, { quoted: m }); break; }
           case 'scamcek': { const t = getTarget(); if (!t) { await safeSend(sock, from, { text: 'Tag member!' }, { quoted: m }); break; } const { score, why } = scamScoreFor(numOf(t)); await safeSend(sock, from, { text: `🔍 *SCAM CHECK*\n👤 @${numOf(t)}\n📊 Skor: ${score}/5\n📝 ${why}\n${score >= 2 ? '⚠️ MENCURIGAKAN' : '✅ Aman'}`, mentions: [t] }, { quoted: m }); break; }
