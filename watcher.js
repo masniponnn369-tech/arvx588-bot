@@ -25,8 +25,8 @@ const FEEDS_WA = [
 
 // ===== FEED 【entity-BAILEYS¦canonical_name=BAILEYS】 - RESMI =====
 const FEEDS_BAILEYS = [
-  { name: '【entity-Baileys¦canonical_name=BAILEYS】 Releases', url: 'https://github.com/WhiskeySockets/Baileys/releases.atom', weight: 100 },
-  { name: '【entity-Baileys¦canonical_name=BAILEYS】 Commits', url: 'https://github.com/WhiskeySockets/Baileys/commits/master.atom', weight: 80 },
+  { name: 'BAILEYS Releases', url: 'https://github.com/WhiskeySockets/Baileys/releases.atom', weight: 100 },
+  { name: 'BAILEYS Commits', url: 'https://github.com/WhiskeySockets/Baileys/commits/master.atom', weight: 80 },
 ];
 
 // ===== FEED SEMUA LIBRARY LU - DARI PACKAGE.JSON - RESMI, GAK ADA IKLAN, GAK KE-BLOCK =====
@@ -34,7 +34,7 @@ const FEEDS_BAILEYS = [
 const FEEDS_LIBS = [
   { name: 'Baileys', url: 'https://github.com/WhiskeySockets/Baileys/releases.atom' },
   { name: 'Boom', url: 'https://github.com/hapijs/boom/releases.atom' },
-  { name: '【entity-Axios¦canonical_name=Axios】', url: 'https://github.com/axios/axios/releases.atom' },
+  { name: 'Axios', url: 'https://github.com/axios/axios/releases.atom' },
   { name: 'Cheerio', url: 'https://github.com/cheeriojs/cheerio/releases.atom' },
   { name: 'Dotenv', url: 'https://github.com/motdotla/dotenv/releases.atom' },
   { name: 'File-Type', url: 'https://github.com/sindresorhus/file-type/releases.atom' },
