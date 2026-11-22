@@ -125,45 +125,8 @@ function isValidWANews(it) {
   const GOOD = ['whatsapp','wa beta','android','ios','web','rolling out','introduces','testing','feature','update','new','backup','sticker','group','status','channel','privacy','call','message','theme'];
   if (!GOOD.some(k => t.includes(k))) return false;
   return true;
-}
+} 
 
-async function fetchWANewsAll(limit = 5) {
-  const all = [];
-  // Fetch semua sumber paralel, tapi dengan header anti-Cloudflare
-  const jobs = WA_NEWS_SOURCES.map(async (src) => {
-    try {
-      const ua = WA_NEWS_UAS[Math.floor(Math.random() * WA_NEWS_UAS.length)];
-      const r = await axios.get(src.url, {
-        timeout: 12000,
-        headers: {
-          'User-Agent': ua,
-          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://www.google.com/',
-          'Cache-Control': 'no-cache',
-        },
-        maxRedirects: 3,
-      });
-      const items = parseRSS(typeof r.data === 'string' ? r.data : '');
-      for (const it of items) {
-        if (isValidWANews(it)) all.push({ ...it, source: src.name });
-      }
-    } catch (e) { console.log('wanews fail', src.name, e.message); }
-  });
-  await Promise.allSettled(jobs);
-
-  // DEDUP: link yang sama jangan double, walau dari sumber beda
-  const seen = new Set();
-  const uniq = [];
-  for (const n of all) {
-    const key = n.link.split('?')[0].toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key); uniq.push(n);
-  }
-  // SORT: paling baru dulu
-  uniq.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
-  return uniq.slice(0, limit);
-}
 function getGroupSettings(gid) {
   if (!db.groups[gid]) { db.groups[gid] = { ...cfg.defense_defaults, antiAll: true, antiEdit: true, antiViewOnce: true, antiZap: true, antiStickerSpam: true, antiFakeAdmin: true, antiImpersonasi: true, scamCheck: true, antiPromosi: true, antiDisappearing: true, antiHapusReaksi: true, antiPollPalsu: true, smartText: true, welcome: true, antilink: true, antispam: true, antivirtex: true, antitag: true, antidelete: true, antiraid: true, autokickintro: true, wanews: true }; saveDB(db); }
   const s = db.groups[gid];
