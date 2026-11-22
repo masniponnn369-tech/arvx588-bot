@@ -25,6 +25,28 @@ const WHITELIST_CODE = cfg.group.whitelist_invite_code || '';
 const CHANNEL_JID = process.env.CHANNEL_JID || cfg.group.channel_jid || ''; // isi JID Channel ARVX kalau ada, contoh: 120207xxx@newsletter
 const USE_PAIRING_CODE = process.env.USE_PAIRING_CODE !== 'false';
 const logger = pino({ level: 'silent' });
+// ===== MATIIN LOG BERISIK BAILEYS - Closing session, SessionEntry, privKey =====
+// Ini yang bikin console penuh, bukan dari pino, tapi dari libsignal Baileys
+const _origLog = console.log;
+console.log = (...args) => {
+  try {
+    const txt = args.map(a => typeof a === 'string' ? a : (a && typeof a === 'object' ? JSON.stringify(a).slice(0, 200) : String(a))).join(' ');
+    // Kalau ada kata-kata ini, JANGAN DI-PRINT
+    if (
+      txt.includes('Closing session') ||
+      txt.includes('SessionEntry') ||
+      txt.includes('Removing old closed session') ||
+      txt.includes('Decrypted message with closed session') ||
+      txt.includes('registrationId') ||
+      txt.includes('ephemeralKeyPair') ||
+      txt.includes('privKey') ||
+      txt.includes('currentRatchet') ||
+      txt.includes('indexInfo') ||
+      txt.includes('pendingPreKey')
+    ) return; // diem, jangan print
+  } catch {}
+  _origLog(...args);
+};
 const groupCache = new NodeCache({ stdTTL: 300, useClones: false });
 const msgRetryCounterCache = new NodeCache({ stdTTL: 600, useClones: false });
 const spamTracker = new NodeCache({ stdTTL: 5, checkperiod: 2 });
