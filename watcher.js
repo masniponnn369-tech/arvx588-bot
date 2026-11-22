@@ -1,8 +1,7 @@
-// watcher.js - ARVX WA NEWS WATCHER v2 - Realtime, No Miss
-import Parser from 'rss-parser';
+// watcher.js - ARVX WA NEWS WATCHER v3 - Realtime, No Miss, TANPA rss-parser
+import axios from 'axios';
 import fs from 'fs';
 
-const parser = new Parser({ headers: { 'User-Agent': 'Mozilla/5.0 ARVX-Watcher' } });
 const SEEN_FILE = './seen_news.json';
 let seen = new Set();
 try { seen = new Set(JSON.parse(fs.readFileSync(SEEN_FILE, 'utf8'))); } catch {}
@@ -37,13 +36,49 @@ const KEYWORDS = [
   'privacy', 'backup', 'theme', 'live photo', 'event', 'mention'
 ];
 
+// Helper: ambil isi tag XML, bersihin CDATA + tag HTML
+function getTag(block, tag) {
+  const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  if (!m) return '';
+  return m[1].replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, '').trim();
+}
+
+// Helper: parse XML RSS jadi array item, tanpa rss-parser
+function parseRSS(xml) {
+  if (!xml || typeof xml !== 'string') return [];
+  // Coba <item> dulu (RSS), kalau gak ada coba <entry> (Atom)
+  let rawItems = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].map(m => m[1]);
+  if (rawItems.length === 0) {
+    rawItems = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/gi)].map(m => m[1]);
+  }
+  return rawItems.map(b => {
+    // Google News link kadang di <link href="...">
+    let link = getTag(b, 'link');
+    if (!link) {
+      const lm = b.match(/<link[^>]*href="([^"]+)"/i);
+      if (lm) link = lm[1];
+    }
+    return {
+      title: getTag(b, 'title'),
+      link: link,
+      guid: getTag(b, 'guid') || getTag(b, 'id') || link,
+      pubDate: getTag(b, 'pubDate') || getTag(b, 'published') || getTag(b, 'updated'),
+      contentSnippet: getTag(b, 'description') || getTag(b, 'summary') || getTag(b, 'content')
+    };
+  });
+}
+
 // Fungsi utama - dipanggil dari index.js
 export async function checkNews(onNew) {
   let baru = 0;
   for (const url of FEEDS) {
     try {
-      const feed = await parser.parseURL(url);
-      for (const item of (feed.items || []).slice(0, 8)) {
+      const r = await axios.get(url, {
+        timeout: 15000,
+        headers: { 'User-Agent': 'Mozilla/5.0 ARVX-Watcher' }
+      });
+      const items = parseRSS(r.data);
+      for (const item of items.slice(0, 8)) {
         const id = item.guid || item.link;
         if (!id || seen.has(id)) continue;
         const text = ((item.title || '') + ' ' + (item.contentSnippet || '')).toLowerCase();
