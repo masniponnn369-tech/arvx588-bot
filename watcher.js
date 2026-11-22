@@ -77,7 +77,10 @@ async function fetchAllFrom(feeds, cacheObj) {
     const key = n.title.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim().slice(0,80);
     if (!seen.has(key)) seen.set(key, n);
   }
-  all = [...seen.values()].sort((a,b)=>b._ts-a._ts);
+   all = [...seen.values()].filter(n => {
+    if (feeds === FEEDS_WA) return isValidWANews(n);
+    return true;
+  }).sort((a,b)=>b._ts-a._ts);
   cacheObj.at = Date.now(); cacheObj.data = all;
   return all;
 }
