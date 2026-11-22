@@ -52,7 +52,7 @@ const FEEDS_LIBS = [
 export const LIB_WEBSITES = [
   { lib: '@whiskeysockets/baileys', versi: '6.7.24', web: 'https://baileys.wiki', github: 'https://github.com/WhiskeySockets/Baileys', npm: 'https://www.npmjs.com/package/@whiskeysockets/baileys' },
   { lib: '@hapi/boom', versi: '10.0.1', web: 'https://hapi.dev', github: 'https://github.com/hapijs/boom', npm: 'https://www.npmjs.com/package/@hapi/boom' },
-  { lib: '【entity-axios¦canonical_name=Axios】', versi: '1.21.1', web: 'https://axios-http.com', 【entity-github¦canonical_name=GitHub】: 'https://github.com/axios/axios', npm: 'https://www.npmjs.com/package/axios' },
+  { lib: 'Axios', versi: '1.21.1', web: 'https://axios-http.com', 【entity-github¦canonical_name=GitHub】: 'https://github.com/axios/axios', npm: 'https://www.npmjs.com/package/axios' },
   { lib: 'cheerio', versi: '1.2.0', web: 'https://cheerio.js.org', 【entity-github¦canonical_name=GitHub】: 'https://github.com/cheeriojs/cheerio', npm: 'https://www.npmjs.com/package/cheerio' },
   { lib: 'dotenv', versi: '18.0.10', web: 'https://github.com/motdotla/dotenv', 【entity-github¦canonical_name=GitHub】: 'https://github.com/motdotla/dotenv', npm: 'https://www.npmjs.com/package/dotenv' },
   { lib: 'file-type', versi: '22.3.0', web: 'https://github.com/sindresorhus/file-type', 【entity-github¦canonical_name=GitHub】: 'https://github.com/sindresorhus/file-type', npm: 'https://www.npmjs.com/package/file-type' },
