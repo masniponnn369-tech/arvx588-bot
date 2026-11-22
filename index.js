@@ -13,7 +13,6 @@ import { fileTypeFromBuffer } from 'file-type';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import yaml from 'js-yaml';
-import fs from 'fs';
 import path from 'path';
 
 // ============ CONFIG ============
