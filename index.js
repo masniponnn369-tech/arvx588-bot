@@ -62,7 +62,18 @@ function numOf(jid) { return normalizeJid(jid).split('@')[0].split(':')[0]; }
 function mentionsOf(j) { return (Array.isArray(j) ? j : [j]).map(normalizeJid).filter(Boolean); }
 function isParticipantAdmin(parts, jid) {
   const tn = numOf(jid);
-  return (parts || []).some(p => { const pid = normalizeJid(p.id || p.jid); const adm = p.admin === 'admin' || p.admin === 'superadmin'; if (!adm) return false; return pid === normalizeJid(jid) || numOf(pid) === tn || (p.lid && numOf(p.lid) === tn) || (p.pn && numOf(p.pn) === tn); });
+  const njid = normalizeJid(jid);
+  return (parts || []).some(p => {
+    const pid = normalizeJid(p.id || p.jid);
+    const adm = p.admin === 'admin' || p.admin === 'superadmin';
+    if (!adm) return false;
+    if (pid === njid) return true;
+    if (numOf(pid) === tn) return true;
+    if (p.lid && numOf(p.lid) === tn) return true;
+    if (p.pn && numOf(p.pn) === tn) return true;
+    if (p.id && String(p.id).endsWith('@lid') && njid.endsWith('@lid') && numOf(pid) === tn) return true;
+    return false;
+  });
 }
 async function safeSend(sock, jid, content, opts) { try { return await sock.sendMessage(normalizeJid(jid), content, opts); } catch (e) { console.log('[safeSend]', e.message); return null; } }
 async function sendOwnerLog(sock, groupName, title, targetNum, detail) { if (!db.global.dmLog) return; try { const w = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }); await safeSend(sock, OWNER_JID, { text: `🛡️ *ARVX 588 LOG*\nGrup: ${groupName}\nTindakan: ${title}\nTarget: +${targetNum}\nDetail: ${detail}\nWaktu: ${w} WIB` }); } catch {} }
@@ -139,7 +150,8 @@ async function startBot() {
       const metadata = await sock.groupMetadata(gid).catch(() => null); if (!metadata) return;
       groupCache.set(gid, metadata); const gname = metadata.subject || 'ARVX 588';
       const botJid = sock.user?.id ? normalizeJid(sock.user.id) : '';
-      const isBotAdmin = isParticipantAdmin(metadata.participants, botJid) || isParticipantAdmin(metadata.participants, `${BOT_NUMBER}@s.whatsapp.net`);
+      const botLid2 = sock.user?.lid ? normalizeJid(sock.user.lid) : '';
+      const isBotAdmin = isParticipantAdmin(metadata.participants, botJid) || (botLid2 ? isParticipantAdmin(metadata.participants, botLid2) : false) || isParticipantAdmin(metadata.participants, `${BOT_NUMBER}@s.whatsapp.net`) || isParticipantAdmin(metadata.participants, `${BOT_NUMBER}@lid`);
       const parts = (anu.participants || []).map(normalizeJid).filter(Boolean);
       if (anu.action === 'add') {
         if (settings.antiraid && isBotAdmin) { const cur = (raidTracker.get(gid) || 0) + parts.length; raidTracker.set(gid, cur); if (cur >= (cfg.thresholds?.raid_max_joins || 5) && !settings.lockdown) { settings.lockdown = true; saveDB(db); try { await sock.groupSettingUpdate(gid, 'announcement'); } catch {} await safeSend(sock, gid, { text: `🚨 *ANTI-RAID LOCKDOWN*\n${cur} akun masuk barengan. Ketik *${PREFIX}lockdown off*` }); } }
@@ -263,7 +275,8 @@ async function startBot() {
         const participants = groupMetadata?.participants || [];
         const isAdmin = isParticipantAdmin(participants, sender);
         const botJid = sock.user?.id ? normalizeJid(sock.user.id) : '';
-        const isBotAdmin = isParticipantAdmin(participants, botJid) || isParticipantAdmin(participants, `${BOT_NUMBER}@s.whatsapp.net`);
+        const botLid = sock.user?.lid ? normalizeJid(sock.user.lid) : '';
+        const isBotAdmin = isParticipantAdmin(participants, botJid) || (botLid ? isParticipantAdmin(participants, botLid) : false) || isParticipantAdmin(participants, `${BOT_NUMBER}@s.whatsapp.net`) || isParticipantAdmin(participants, `${BOT_NUMBER}@lid`);
 
         // Simpan Anti-Delete lengkap: teks + media + VN + stiker + dokumen
         if (isGroup && m.key.id) {
