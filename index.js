@@ -47,6 +47,22 @@ console.log = (...args) => {
   } catch {}
   _origLog(...args);
 };
+// Filter juga console.error biar Bad MAC gak numpuk
+const _origError = console.error;
+console.error = (...args) => {
+  try {
+    const txt = args.map(a => typeof a === 'string' ? a : String(a)).join(' ');
+    if (
+      txt.includes('Bad MAC') ||
+      txt.includes('Session error') ||
+      txt.includes('SessionCipher') ||
+      txt.includes('Closing session') ||
+      txt.includes('Removing old closed session') ||
+      txt.includes('Closing open session')
+    ) return;
+  } catch {}
+  _origError(...args);
+};
 const groupCache = new NodeCache({ stdTTL: 300, useClones: false });
 const msgRetryCounterCache = new NodeCache({ stdTTL: 600, useClones: false });
 const spamTracker = new NodeCache({ stdTTL: 5, checkperiod: 2 });
