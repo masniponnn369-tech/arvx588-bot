@@ -220,21 +220,14 @@ async function startBot() {
     for (const [gid, evs] of Object.entries(db.events || {})) for (const ev of evs) { if (!ev.reminded && ev.at && Date.now() >= ev.at - 3600 * 1000 && Date.now() < ev.at) { ev.reminded = true; saveDB(db); await safeSend(sock, gid, { text: `📅 *REMINDER EVENT - 1 JAM LAGI*\n🎯 ${ev.title}\n🕐 ${ev.when}\nSiap-siap!` }); } }
     // 35 Channel Status tiruan tiap 24 jam (kirim ke grup + log channel)
     if (db.channelPosts?.length) { const last = db.channelPosts[db.channelPosts.length - 1]; if (Date.now() - last.at > 24 * 3600 * 1000) { /* placeholder: admin bisa .channelpost buat update baru */ } }
-    // === ARVX WA NEWS WATCHER - Cek tiap 15 menit biar realtime tapi gak ke-block ===
+    // === ARVX WA NEWS WATCHER - MODE PERINTAH, NO AUTO SPAM ===
+    // Auto-spam DIMATIIN. Berita cuma dikirim kalau ada yang ketik .news
+    // Jadi pas START, bot diem, gak kirim ke grup / owner.
     if (!global._lastNewsCheck || Date.now() - global._lastNewsCheck > 15 * 60 * 1000) {
       global._lastNewsCheck = Date.now();
       try {
-        await checkNews(async (news) => {
-          // Kirim ke semua grup yang nyalain wanews (default: semua grup nyala)
-          for (const [gid, gset] of Object.entries(db.groups || {})) {
-            if (gset.wanews === false) continue; // kalau admin matiin, skip
-            if (isBotDisabled(gid)) continue;
-            await safeSend(sock, gid, { text: `📰 *UPDATE WHATSAPP BARU - ${news.source}*\n\n*${news.title}*\n${news.snippet}\n\n🕐 ${news.date}\n🔗 ${news.link}\n\n_Ketik ${PREFIX}wanews off kalau gak mau dapet update_`, });
-            await new Promise(r => setTimeout(r, 1000)); // delay 1 detik biar gak spam
-          }
-          // Log ke owner juga
-          try { await safeSend(sock, `${OWNER_NUMBER}@s.whatsapp.net`, { text: `📰 NEWS: ${news.title}\n${news.link}` }); } catch {}
-        });
+        // checkNews(null) = cuma nyatet, GAK NGIRIM
+        await checkNews(null);
       } catch (e) { console.log('watcher err:', e.message); }
     }
   }, 30 * 1000);
