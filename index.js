@@ -1,3 +1,4 @@
+import { checkNews } from './watcher.js';
 import 'dotenv/config';
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadContentFromMessage } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
@@ -46,7 +47,7 @@ function loadDB() {
 function saveDB(d) { try { fs.writeFileSync(DB_PATH, JSON.stringify(d, null, 2)); } catch {} }
 let db = loadDB();
 function getGroupSettings(gid) {
-  if (!db.groups[gid]) { db.groups[gid] = { ...cfg.defense_defaults, antiAll: true, antiEdit: true, antiViewOnce: true, antiZap: true, antiStickerSpam: true, antiFakeAdmin: true, antiImpersonasi: true, scamCheck: true, antiPromosi: true, antiDisappearing: true, antiHapusReaksi: true, antiPollPalsu: true, smartText: true, welcome: true, antilink: true, antispam: true, antivirtex: true, antitag: true, antidelete: true, antiraid: true, autokickintro: true }; saveDB(db); }
+  if (!db.groups[gid]) { db.groups[gid] = { ...cfg.defense_defaults, antiAll: true, antiEdit: true, antiViewOnce: true, antiZap: true, antiStickerSpam: true, antiFakeAdmin: true, antiImpersonasi: true, scamCheck: true, antiPromosi: true, antiDisappearing: true, antiHapusReaksi: true, antiPollPalsu: true, smartText: true, welcome: true, antilink: true, antispam: true, antivirtex: true, antitag: true, antidelete: true, antiraid: true, autokickintro: true, wanews: true }; saveDB(db); }
   const s = db.groups[gid];
   for (const k of ['antiAll','antiEdit','antiViewOnce','antiZap','antiStickerSpam','antiFakeAdmin','antiImpersonasi','scamCheck','antiPromosi','antiDisappearing','antiHapusReaksi','antiPollPalsu','smartText']) if (s[k] === undefined) s[k] = true;
   // HAPUS KATA KOTOR: paksa mati, admin asli yang handle
@@ -139,7 +140,25 @@ async function startBot() {
     for (const [gid, evs] of Object.entries(db.events || {})) for (const ev of evs) { if (!ev.reminded && ev.at && Date.now() >= ev.at - 3600 * 1000 && Date.now() < ev.at) { ev.reminded = true; saveDB(db); await safeSend(sock, gid, { text: `📅 *REMINDER EVENT - 1 JAM LAGI*\n🎯 ${ev.title}\n🕐 ${ev.when}\nSiap-siap!` }); } }
     // 35 Channel Status tiruan tiap 24 jam (kirim ke grup + log channel)
     if (db.channelPosts?.length) { const last = db.channelPosts[db.channelPosts.length - 1]; if (Date.now() - last.at > 24 * 3600 * 1000) { /* placeholder: admin bisa .channelpost buat update baru */ } }
+    // === ARVX WA NEWS WATCHER - Cek tiap 15 menit biar realtime tapi gak ke-block ===
+    if (!global._lastNewsCheck || Date.now() - global._lastNewsCheck > 15 * 60 * 1000) {
+      global._lastNewsCheck = Date.now();
+      try {
+        await checkNews(async (news) => {
+          // Kirim ke semua grup yang nyalain wanews (default: semua grup nyala)
+          for (const [gid, gset] of Object.entries(db.groups || {})) {
+            if (gset.wanews === false) continue; // kalau admin matiin, skip
+            if (isBotDisabled(gid)) continue;
+            await safeSend(sock, gid, { text: `📰 *UPDATE WHATSAPP BARU - ${news.source}*\n\n*${news.title}*\n${news.snippet}\n\n🕐 ${news.date}\n🔗 ${news.link}\n\n_Ketik ${PREFIX}wanews off kalau gak mau dapet update_`, });
+            await new Promise(r => setTimeout(r, 1000)); // delay 1 detik biar gak spam
+          }
+          // Log ke owner juga
+          try { await safeSend(sock, `${OWNER_NUMBER}@s.whatsapp.net`, { text: `📰 NEWS: ${news.title}\n${news.link}` }); } catch {}
+        });
+      } catch (e) { console.log('watcher err:', e.message); }
+    }
   }, 30 * 1000);
+  
   sock.ev.on('groups.update', async ([ev]) => { if (!ev?.id) return; try { const m = await sock.groupMetadata(ev.id); groupCache.set(ev.id, m); } catch {} });
 
   // ============ 20-21-34 GROUP PARTICIPANTS ============
@@ -351,6 +370,17 @@ async function startBot() {
           case 'verif': { // 37 Username Key
             if (!isGroup) break; const expect = db.verifCodes[from]?.[senderNumber]; if (!expect) { await safeSend(sock, from, { text: 'Kamu belum punya kode verif. Keluar-masuk lagi biar dapet kode.' }, { quoted: m }); break; }
             if (text.trim() === String(expect)) { db.intros[from] ??= {}; db.intros[from][senderNumber] = { ...(db.intros[from][senderNumber] || {}), verified: true, verifiedAt: Date.now() }; saveDB(db); await safeSend(sock, from, { text: `✅ *VERIFIKASI BERHASIL*\n@${senderNumber} resmi terverifikasi ARVX 588!`, mentions: [sender] }, { quoted: m }); } else await safeSend(sock, from, { text: '❌ Kode salah! Cek kode di pesan welcome.' }, { quoted: m }); break;
+          }
+                      case 'wanews': {
+            if (!isGroup) break;
+            if (text === 'off' && (isAdmin || isOwner)) { const s = getGroupSettings(from); s.wanews = false; saveDB(db); await safeSend(sock, from, { text: '🔕 WA News OFF di grup ini.' }, { quoted: m }); break; }
+            if (text === 'on' && (isAdmin || isOwner)) { const s = getGroupSettings(from); s.wanews = true; saveDB(db); await safeSend(sock, from, { text: '🔔 WA News ON di grup ini.' }, { quoted: m }); break; }
+            // Kalau cuma .wanews doang, langsung cek manual sekarang
+            await safeSend(sock, from, { text: '🔍 Lagi cek update WhatsApp terbaru...' }, { quoted: m });
+            let count = 0; let out = `📰 *5 UPDATE WHATSAPP TERBARU*\n\n`;
+            await checkNews(async (n) => { count++; out += `*${count}. ${n.title}*\n[${n.source}] ${n.date}\n${n.link}\n\n`; });
+            if (!count) out += `Udah paling update! Gak ada berita baru dalam 15 menit terakhir.\nCoba lagi nanti, atau ketik ${PREFIX}wanews on buat auto-update.`;
+            await safeSend(sock, from, { text: out }, { quoted: m }); break;
           }
           case 'menu': case 'help': {
             // 28 Interactive Buttons: Baileys interactiveMessage - fallback teks kalau gagal
