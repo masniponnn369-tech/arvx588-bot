@@ -8,12 +8,9 @@ const SEEN_FILE = './seen_news.json';
 const CACHE_MS = 15 * 60 * 1000;
 
 const FEEDS_WA = [
-  { name: 'WABetaInfo', url: 'https://wabetainfo.com/feed/', weight: 100 },
-  { name: 'WABetaInfo Android', url: 'https://wabetainfo.com/category/android/feed/', weight: 90 },
+   { name: 'WABetaInfo Android', url: 'https://wabetainfo.com/category/android/feed/', weight: 90 },
   { name: 'WABetaInfo iOS', url: 'https://wabetainfo.com/category/ios/feed/', weight: 90 },
   { name: 'WABetaInfo News', url: 'https://wabetainfo.com/category/news/feed/', weight: 85 },
-  { name: 'GSMArena WhatsApp', url: 'https://www.gsmarena.com/rss-news.php3?sTag=WhatsApp', weight: 70 },
-  { name: 'SheetWA News', url: 'https://sheetwa.com/blog/category/news/feed/', weight: 65 },
   { name: 'Gadgets360 WhatsApp', url: 'https://www.gadgets360.com/tags/whatsapp/rss', weight: 60 },
 ];
 
@@ -25,6 +22,11 @@ const FEEDS_BAILEYS = [
 ];
 
 const BAD_WORDS = ['sponsored','advertisement','promo code','giveaway','discount code','buy now','coupon','casino','slot gacor','judi','togel','crypto giveaway','airdrop'];
+function isValidWANews(n) {
+  if (n.source.includes('WABetaInfo') || n.source.includes('SheetWA')) return true;
+  const t = n.title.toLowerCase();
+  return t.includes('whatsapp') || t.includes('wa beta') || t.includes('meta') || t.includes('wabetainfo');
+}
 function isBad(t='', s='') { const x = (t+' '+s).toLowerCase(); return BAD_WORDS.some(w => x.includes(w)); }
 function loadSeen() { try { return JSON.parse(fs.readFileSync(SEEN_FILE,'utf8')); } catch { return []; } }
 function saveSeen(a) { try { fs.writeFileSync(SEEN_FILE, JSON.stringify(a.slice(-200))); } catch {} }
