@@ -155,14 +155,18 @@ async function startBot() {
       const parts = (anu.participants || []).map(normalizeJid).filter(Boolean);
       if (anu.action === 'add') {
         if (settings.antiraid && isBotAdmin) { const cur = (raidTracker.get(gid) || 0) + parts.length; raidTracker.set(gid, cur); if (cur >= (cfg.thresholds?.raid_max_joins || 5) && !settings.lockdown) { settings.lockdown = true; saveDB(db); try { await sock.groupSettingUpdate(gid, 'announcement'); } catch {} await safeSend(sock, gid, { text: `🚨 *ANTI-RAID LOCKDOWN*\n${cur} akun masuk barengan. Ketik *${PREFIX}lockdown off*` }); } }
-        for (const participant of parts) {
-          const userNum = numOf(participant); if (!userNum) continue;
+               for (const participant of parts) {
+          // FIX LID: ambil nomer asli dari metadata, jangan pake LID buat scamCheck
+          const metaP = metadata.participants.find(x => normalizeJid(x.id || x.jid) === participant);
+          const realPn = metaP?.pn ? numOf(metaP.pn) : '';
+          const userNum = realPn || numOf(participant); if (!userNum) continue;
           if (db.blacklist[gid]?.[userNum]) { if (isBotAdmin) { await safeSend(sock, gid, { text: `⛔ *BLACKLIST*\n@${userNum} diblokir permanen.`, mentions: [participant] }); try { await sock.groupParticipantsUpdate(gid, [participant], 'remove'); } catch { try { await sock.groupParticipantsUpdate(gid, [pnOf(participant)], 'remove'); } catch {} } } continue; }
           // 37 Verif code baru
           const code = makeVerifCode(); db.verifCodes[gid] ??= {}; db.verifCodes[gid][userNum] = code; saveDB(db);
           db.pendingIntros[gid] ??= {}; db.pendingIntros[gid][userNum] = Date.now(); saveDB(db);
-          // 10 Scam Check
-          if (settings.scamCheck) { const { score, why } = scamScoreFor(userNum); if (score >= 2) await safeSend(sock, gid, { text: `⚠️ *SCAM CHECK*\n👤 @${userNum}\n🔍 ${why}\nAdmin pantau!`, mentions: [participant] }); }
+          
+          // 10 Scam Check - FIX: kalau cuma dapet LID (gak ada pn), jangan tuduh, diem aja
+          if (settings.scamCheck && realPn) { const { score, why } = scamScoreFor(realPn); if (score >= 2) await safeSend(sock, gid, { text: `⚠️ *SCAM CHECK*\n👤 @${userNum}\n🔍 ${why}\nAdmin pantau!`, mentions: [participant] }); }
           // 8 Anti-Fake Admin: cek tag palsu di metadata (kalau ada tag admin tapi bukan admin)
           if (settings.antiFakeAdmin) { const p = metadata.participants.find(x => normalizeJid(x.id || x.jid) === participant); if (p?.tag && /admin|owner/i.test(p.tag) && !isParticipantAdmin(metadata.participants, participant)) await safeSend(sock, gid, { text: `⚠️ @${userNum} pake tag "${p.tag}" tapi BUKAN admin!`, mentions: [participant] }); }
           if (settings.welcome) await safeSend(sock, gid, { text: `Halo @${userNum}! 👋\nKode verif kamu: *${code}*\nKetik *${PREFIX}verif ${code}* setelah isi intro.\n\n${INTRO_CARD_TEXT}`, mentions: [participant] });
